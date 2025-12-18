@@ -1,0 +1,592 @@
+// KBC Questions Database
+const kbcQuestions = [
+    {
+        amount: 1000,
+        question: "Which planet is known as the Red Planet?",
+        options: ["Earth", "Mars", "Jupiter", "Venus"],
+        answer: "Mars"
+    },
+    {
+        amount: 2000,
+        question: "Who wrote the Indian National Anthem?",
+        options: ["Bankim Chandra", "Rabindranath Tagore", "Subhash Chandra Bose", "Sarojini Naidu"],
+        answer: "Rabindranath Tagore"
+    },
+    {
+        amount: 5000,
+        question: "What is the capital of Karnataka?",
+        options: ["Chennai", "Hyderabad", "Bengaluru", "Mysuru"],
+        answer: "Bengaluru"
+    },
+    {
+        amount: 10000,
+        question: "Which gas do plants absorb from the atmosphere?",
+        options: ["Oxygen", "Nitrogen", "Carbon Dioxide", "Hydrogen"],
+        answer: "Carbon Dioxide"
+    },
+    {
+        amount: 20000,
+        question: "Who was the first Prime Minister of India?",
+        options: ["Sardar Patel", "Jawaharlal Nehru", "Rajendra Prasad", "Gandhi"],
+        answer: "Jawaharlal Nehru"
+    },
+    {
+        amount: 40000,
+        question: "Which is the largest ocean in the world?",
+        options: ["Atlantic", "Indian", "Arctic", "Pacific"],
+        answer: "Pacific"
+    },
+    {
+        amount: 80000,
+        question: "In which year did India get independence?",
+        options: ["1942", "1945", "1947", "1950"],
+        answer: "1947"
+    },
+    {
+        amount: 160000,
+        question: "Which element has the chemical symbol 'Au'?",
+        options: ["Silver", "Oxygen", "Gold", "Argon"],
+        answer: "Gold"
+    },
+    {
+        amount: 320000,
+        question: "Who is known as the Missile Man of India?",
+        options: ["C V Raman", "APJ Abdul Kalam", "Homi Bhabha", "Vikram Sarabhai"],
+        answer: "APJ Abdul Kalam"
+    },
+    {
+        amount: 640000,
+        question: "Which Indian state has the longest coastline?",
+        options: ["Kerala", "Tamil Nadu", "Gujarat", "Maharashtra"],
+        answer: "Gujarat"
+    },
+    {
+        amount: 1250000,
+        question: "What does CPU stand for?",
+        options: ["Central Processing Unit", "Computer Power Unit", "Control Processing Unit", "Core Program Unit"],
+        answer: "Central Processing Unit"
+    },
+    {
+        amount: 2500000,
+        question: "Who discovered gravity?",
+        options: ["Einstein", "Newton", "Galileo", "Tesla"],
+        answer: "Newton"
+    },
+    {
+        amount: 5000000,
+        question: "Which Indian river is the longest?",
+        options: ["Yamuna", "Godavari", "Ganga", "Brahmaputra"],
+        answer: "Ganga"
+    },
+    {
+        amount: 10000000,
+        question: "Which Mughal emperor built the Taj Mahal?",
+        options: ["Akbar", "Babur", "Shah Jahan", "Aurangzeb"],
+        answer: "Shah Jahan"
+    },
+    {
+        amount: 70000000,
+        question: "Which country was formerly known as Persia?",
+        options: ["Iraq", "Iran", "Turkey", "Afghanistan"],
+        answer: "Iran"
+    }
+];
+
+// Game State
+let gameState = {
+    currentQuestion: 0,
+    earnedAmount: 0,
+    lifelinesUsed: {
+        fiftyFifty: false,
+        phone: false,
+        audience: false
+    },
+    answered: false,
+    hiddenOptions: []
+};
+
+// DOM Elements
+const startBtn = document.getElementById('startBtn');
+const nextBtn = document.getElementById('nextBtn');
+const quitBtn = document.getElementById('quitBtn');
+const restartBtn = document.getElementById('restartBtn');
+const fiftyFiftyBtn = document.getElementById('fiftyFiftyBtn');
+const phoneBtn = document.getElementById('phoneBtn');
+const audienceBtn = document.getElementById('audienceBtn');
+const optionBtns = document.querySelectorAll('.option-btn');
+
+// Screen Elements
+const startScreen = document.getElementById('startScreen');
+const quizScreen = document.getElementById('quizScreen');
+const resultScreen = document.getElementById('resultScreen');
+const gameOverScreen = document.getElementById('gameOverScreen');
+
+// Initialize Event Listeners
+startBtn.addEventListener('click', startGame);
+nextBtn.addEventListener('click', nextQuestion);
+quitBtn.addEventListener('click', quitGame);
+restartBtn.addEventListener('click', restartGame);
+fiftyFiftyBtn.addEventListener('click', useFiftyFifty);
+phoneBtn.addEventListener('click', usePhone);
+audienceBtn.addEventListener('click', useAudience);
+
+optionBtns.forEach((btn, index) => {
+    btn.addEventListener('click', () => selectOption(index));
+});
+
+// Start Game Function
+function startGame() {
+    gameState.currentQuestion = 0;
+    gameState.earnedAmount = 0;
+    gameState.lifelinesUsed = { fiftyFifty: false, phone: false, audience: false };
+    gameState.answered = false;
+    gameState.hiddenOptions = [];
+    
+    hideAllScreens();
+    showScreen(quizScreen);
+    loadQuestion();
+    enableLifelines();
+}
+
+// Load Current Question
+function loadQuestion() {
+    const question = kbcQuestions[gameState.currentQuestion];
+    
+    // Update question number and amount
+    document.getElementById('questionNum').textContent = `Question ${gameState.currentQuestion + 1} of 15`;
+    document.getElementById('currentAmount').textContent = `Current: Rs. ${formatAmount(question.amount)}`;
+    
+    // Update question text
+    document.getElementById('questionText').textContent = question.question;
+    
+    // Shuffle and load options
+    const shuffledOptions = [...question.options].sort(() => Math.random() - 0.5);
+    optionBtns.forEach((btn, index) => {
+        btn.querySelector('.option-text').textContent = shuffledOptions[index];
+        btn.dataset.answer = shuffledOptions[index];
+        btn.classList.remove('correct', 'wrong', 'selected', 'hidden');
+        btn.style.display = 'flex';
+        btn.disabled = false;
+    });
+    
+    // Reset state
+    gameState.answered = false;
+    gameState.hiddenOptions = [];
+    resetLifelines();
+    updateLevelPanel();
+}
+
+// Select Option
+function selectOption(index) {
+    if (gameState.answered) return;
+    
+    const selectedOption = optionBtns[index].dataset.answer;
+    const correctAnswer = kbcQuestions[gameState.currentQuestion].answer;
+    
+    gameState.answered = true;
+    
+    // Mark all options
+    optionBtns.forEach((btn) => {
+        btn.disabled = true;
+        if (btn.dataset.answer === correctAnswer) {
+            btn.classList.add('correct');
+        }
+    });
+    
+    // Check answer
+    const isCorrect = selectedOption === correctAnswer;
+    optionBtns[index].classList.add(isCorrect ? 'correct' : 'wrong');
+    
+    // Show result
+    setTimeout(() => {
+        showResult(isCorrect);
+    }, 1000);
+}
+
+// Show Result
+function showResult(isCorrect) {
+    const question = kbcQuestions[gameState.currentQuestion];
+    const resultAmount = isCorrect ? question.amount : (gameState.currentQuestion > 0 ? kbcQuestions[gameState.currentQuestion - 1].amount : 0);
+    
+    if (isCorrect) {
+        gameState.earnedAmount = question.amount;
+    }
+    
+    // Update result screen
+    const resultIcon = document.getElementById('resultIcon');
+    const resultTitle = document.getElementById('resultTitle');
+    const resultMessage = document.getElementById('resultMessage');
+    const resultAmountEl = document.getElementById('resultAmount');
+    
+    if (isCorrect) {
+        resultIcon.textContent = '✅';
+        resultTitle.textContent = 'Correct Answer!';
+        resultMessage.textContent = 'Great job! Your answer is correct.';
+        resultAmountEl.textContent = `Rs. ${formatAmount(gameState.earnedAmount)}`;
+    } else {
+        resultIcon.textContent = '❌';
+        resultTitle.textContent = 'Wrong Answer!';
+        resultMessage.textContent = 'Oops! That was incorrect. Game Over!';
+        resultAmountEl.textContent = `Rs. ${formatAmount(gameState.earnedAmount)}`;
+    }
+    
+    hideAllScreens();
+    showScreen(resultScreen);
+    
+    // Auto move to next or game over
+    if (isCorrect) {
+        if (gameState.currentQuestion < kbcQuestions.length - 1) {
+            nextBtn.style.display = 'block';
+        } else {
+            // Game won
+            setTimeout(endGame, 2000);
+        }
+    } else {
+        // Game over
+        setTimeout(endGame, 2000);
+    }
+}
+
+// Next Question
+function nextQuestion() {
+    if (gameState.currentQuestion < kbcQuestions.length - 1) {
+        gameState.currentQuestion++;
+        hideAllScreens();
+        showScreen(quizScreen);
+        loadQuestion();
+    } else {
+        endGame();
+    }
+}
+
+// End Game
+function endGame() {
+    const safeLevels = [10000, 320000, 10000000];
+    let guaranteedAmount = gameState.earnedAmount;
+    
+    for (let level of safeLevels) {
+        if (gameState.earnedAmount >= level) {
+            guaranteedAmount = level;
+        }
+    }
+    
+    // Update game over screen
+    document.getElementById('finalAmount').textContent = `Rs. ${formatAmount(gameState.earnedAmount)}`;
+    
+    if (guaranteedAmount > gameState.earnedAmount) {
+        document.getElementById('safeLevelInfo').style.display = 'block';
+        document.getElementById('safeLevelAmount').textContent = `Rs. ${formatAmount(guaranteedAmount)}`;
+    } else {
+        document.getElementById('safeLevelInfo').style.display = 'none';
+    }
+    
+    hideAllScreens();
+    showScreen(gameOverScreen);
+}
+
+// Quit Game
+function quitGame() {
+    if (confirm('Are you sure you want to quit? Your progress will be lost.')) {
+        endGame();
+    }
+}
+
+// Restart Game
+function restartGame() {
+    startGame();
+}
+
+// ===== ENHANCED LIFELINES =====
+
+// 1. FIFTY-FIFTY LIFELINE
+function useFiftyFifty() {
+    if (gameState.lifelinesUsed.fiftyFifty || gameState.answered) return;
+    
+    gameState.lifelinesUsed.fiftyFifty = true;
+    fiftyFiftyBtn.disabled = true;
+    fiftyFiftyBtn.style.opacity = '0.5';
+    fiftyFiftyBtn.innerHTML = '<span class="lifeline-icon">✓</span><span class="lifeline-name">Used</span>';
+    
+    const question = kbcQuestions[gameState.currentQuestion];
+    const correctAnswer = question.answer;
+    
+    const wrongOptions = [];
+    optionBtns.forEach((btn, index) => {
+        if (btn.dataset.answer !== correctAnswer) {
+            wrongOptions.push(index);
+        }
+    });
+    
+    const toHide = wrongOptions.sort(() => Math.random() - 0.5).slice(0, 2);
+    
+    toHide.forEach((index, delay) => {
+        setTimeout(() => {
+            optionBtns[index].classList.add('hidden');
+            optionBtns[index].style.animation = 'fadeOut 0.5s ease';
+            gameState.hiddenOptions.push(index);
+        }, delay * 200);
+    });
+    
+    showEnhancedNotification(
+        '50-50 Lifeline Used! ✅',
+        'Two incorrect options have been removed. You now have 2 options left!',
+        'success'
+    );
+}
+
+// 2. PHONE A FRIEND LIFELINE
+function usePhone() {
+    if (gameState.lifelinesUsed.phone || gameState.answered) return;
+    
+    gameState.lifelinesUsed.phone = true;
+    phoneBtn.disabled = true;
+    phoneBtn.style.opacity = '0.5';
+    phoneBtn.innerHTML = '<span class="lifeline-icon">✓</span><span class="lifeline-name">Used</span>';
+    
+    const question = kbcQuestions[gameState.currentQuestion];
+    const correctAnswer = question.answer;
+    const pollResults = generatePhonePollResults(correctAnswer);
+    
+    showPhoneResult(pollResults, question);
+}
+
+// 3. AUDIENCE POLL LIFELINE
+function useAudience() {
+    if (gameState.lifelinesUsed.audience || gameState.answered) return;
+    
+    gameState.lifelinesUsed.audience = true;
+    audienceBtn.disabled = true;
+    audienceBtn.style.opacity = '0.5';
+    audienceBtn.innerHTML = '<span class="lifeline-icon">✓</span><span class="lifeline-name">Used</span>';
+    
+    const question = kbcQuestions[gameState.currentQuestion];
+    const correctAnswer = question.answer;
+    const pollResults = generateAudiencePollResults(correctAnswer);
+    
+    showAudienceResult(pollResults, question);
+}
+// Generate Phone Friend Poll Results
+function generatePhonePollResults(correctAnswer) {
+    const results = [];
+    
+    optionBtns.forEach((btn, index) => {
+        const isCorrect = btn.dataset.answer === correctAnswer;
+        let percentage;
+        
+        if (isCorrect) {
+            percentage = Math.floor(Math.random() * 45 + 50); // 50-95%
+        } else {
+            percentage = Math.floor(Math.random() * 30);      // 0-30%
+        }
+        
+        results.push({
+            index: index,
+            option: btn.querySelector('.option-text').textContent,
+            percentage: percentage,
+            isCorrect: isCorrect,
+            label: String.fromCharCode(65 + index)
+        });
+    });
+    
+    // Normalize to 100%
+    const total = results.reduce((sum, r) => sum + r.percentage, 0);
+    results.forEach(r => {
+        r.percentage = Math.round((r.percentage / total) * 100);
+    });
+    
+    return results;
+}
+
+// Generate Audience Poll Results
+function generateAudiencePollResults(correctAnswer) {
+    const results = [];
+    
+    optionBtns.forEach((btn, index) => {
+        const isCorrect = btn.dataset.answer === correctAnswer;
+        let percentage;
+        
+        if (isCorrect) {
+            percentage = Math.floor(Math.random() * 45 + 45); // 45-90%
+        } else {
+            percentage = Math.floor(Math.random() * 25);      // 0-25%
+        }
+        
+        results.push({
+            index: index,
+            option: btn.querySelector('.option-text').textContent,
+            percentage: percentage,
+            isCorrect: isCorrect,
+            label: String.fromCharCode(65 + index)
+        });
+    });
+    
+    // Normalize to 100%
+    const total = results.reduce((sum, r) => sum + r.percentage, 0);
+    results.forEach(r => {
+        r.percentage = Math.round((r.percentage / total) * 100);
+    });
+    
+    return results;
+}
+// Show Phone Result in Modal
+function showPhoneResult(results, question) {
+    const modal = document.createElement('div');
+    modal.className = 'lifeline-modal';
+    modal.innerHTML = `
+        <div class="lifeline-modal-content phone-modal">
+            <div class="modal-header">
+                <span class="modal-icon">📞</span>
+                <h3>Phone A Friend</h3>
+                <button class="modal-close" onclick="this.closest('.lifeline-modal').remove()">✕</button>
+            </div>
+            <div class="modal-body">
+                <p class="expert-info">Your friend thinks:</p>
+                <div class="poll-container">
+                    ${results.map(result => `
+                        <div class="poll-item ${result.isCorrect ? 'correct-hint' : ''}">
+                            <div class="poll-option">
+                                <span class="poll-label">${result.label}.</span>
+                                <span class="poll-text">${result.option}</span>
+                            </div>
+                            <div class="poll-bar-container">
+                                <div class="poll-bar" style="width: ${result.percentage}%; background: ${result.isCorrect ? '#43e97b' : '#ff6b6b'};">
+                                    <span class="poll-percentage">${result.percentage}%</span>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+                <p class="modal-note">💡 Your friend is fairly confident about the answer they highlighted.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="this.closest('.lifeline-modal').remove()">Thanks!</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+// Show Audience Result in Modal
+function showAudienceResult(results, question) {
+    const modal = document.createElement('div');
+    modal.className = 'lifeline-modal';
+    modal.innerHTML = `
+        <div class="lifeline-modal-content audience-modal">
+            <div class="modal-header">
+                <span class="modal-icon">👥</span>
+                <h3>Audience Poll</h3>
+                <button class="modal-close" onclick="this.closest('.lifeline-modal').remove()">✕</button>
+            </div>
+            <div class="modal-body">
+                <p class="audience-info">Here's what the audience voted:</p>
+                <div class="poll-container">
+                    ${results.map(result => `
+                        <div class="poll-item ${result.isCorrect ? 'correct-hint' : ''}">
+                            <div class="poll-option">
+                                <span class="poll-label">${result.label}.</span>
+                                <span class="poll-text">${result.option}</span>
+                            </div>
+                            <div class="poll-bar-container">
+                                <div class="poll-bar audience-bar" style="width: ${result.percentage}%; background: ${result.isCorrect ? '#38f9d7' : '#667eea'};">
+                                    <span class="poll-percentage">${result.percentage}%</span>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+                <p class="modal-note">📊 The audience consensus is shown above.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="this.closest('.lifeline-modal').remove()">Got it!</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+// Enhanced Notification Function
+function showEnhancedNotification(title, message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `enhanced-notification ${type}`;
+    notification.innerHTML = `
+        <div class="notification-content">
+            <span class="notification-icon">${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span>
+            <div class="notification-text">
+                <h4>${title}</h4>
+                <p>${message}</p>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => notification.classList.add('show'), 10);
+    
+    setTimeout(() => {
+        notification.classList.remove('show');
+        setTimeout(() => notification.remove(), 300);
+    }, 4000);
+}
+// Reset Lifelines Display
+function resetLifelines() {
+    const states = {
+        fiftyFifty: { btn: fiftyFiftyBtn, icon: '5️⃣0️⃣', name: '50-50' },
+        phone: { btn: phoneBtn, icon: '📞', name: 'Phone' },
+        audience: { btn: audienceBtn, icon: '👥', name: 'Audience' }
+    };
+    
+    for (const [key, state] of Object.entries(states)) {
+        const used = gameState.lifelinesUsed[key === 'fiftyFifty' ? 'fiftyFifty' : key === 'phone' ? 'phone' : 'audience'];
+        state.btn.disabled = used;
+        state.btn.style.opacity = used ? '0.5' : '1';
+        state.btn.innerHTML = used ? 
+            `<span class="lifeline-icon">✓</span><span class="lifeline-name">Used</span>` : 
+            `<span class="lifeline-icon">${state.icon}</span><span class="lifeline-name">${state.name}</span>`;
+    }
+}
+
+
+// Reset Lifelines Display
+function resetLifelines() {
+    fiftyFiftyBtn.disabled = gameState.lifelinesUsed.fiftyFifty;
+    phoneBtn.disabled = gameState.lifelinesUsed.phone;
+    audienceBtn.disabled = gameState.lifelinesUsed.audience;
+}
+
+// Enable Lifelines
+function enableLifelines() {
+    fiftyFiftyBtn.disabled = false;
+    phoneBtn.disabled = false;
+    audienceBtn.disabled = false;
+}
+
+// Update Level Panel Highlighting
+function updateLevelPanel() {
+    document.querySelectorAll('.level-item').forEach((item, index) => {
+        item.classList.remove('current-level');
+        if (index === gameState.currentQuestion) {
+            item.classList.add('current-level');
+        }
+    });
+}
+
+// Utility Functions
+function formatAmount(amount) {
+    return amount.toLocaleString('en-IN');
+}
+
+function showScreen(screen) {
+    screen.classList.add('active');
+}
+
+function hideAllScreens() {
+    document.querySelectorAll('.screen').forEach(screen => {
+        screen.classList.remove('active');
+    });
+}
+
+function showNotification(message) {
+    alert(message);
+}
+
+
+// Initialize Game
+console.log('KBC Game Ready!');
