@@ -121,7 +121,7 @@ const quizScreen = document.getElementById('quizScreen');
 const resultScreen = document.getElementById('resultScreen');
 const gameOverScreen = document.getElementById('gameOverScreen');
 
-// Initialize Event Listeners
+// ===== INITIALIZE EVENT LISTENERS =====
 startBtn.addEventListener('click', startGame);
 nextBtn.addEventListener('click', nextQuestion);
 quitBtn.addEventListener('click', quitGame);
@@ -131,11 +131,15 @@ phoneBtn.addEventListener('click', usePhone);
 audienceBtn.addEventListener('click', useAudience);
 
 optionBtns.forEach((btn, index) => {
-    btn.addEventListener('click', () => selectOption(index));
+    btn.addEventListener('click', () => {
+        console.log('✅ Option clicked:', index);
+        selectOption(index);
+    });
 });
 
-// Start Game Function
+// ===== START GAME FUNCTION =====
 function startGame() {
+    console.log('🎮 Game Started');
     gameState.currentQuestion = 0;
     gameState.earnedAmount = 0;
     gameState.lifelinesUsed = { fiftyFifty: false, phone: false, audience: false };
@@ -148,9 +152,11 @@ function startGame() {
     enableLifelines();
 }
 
-// Load Current Question
+// ===== LOAD CURRENT QUESTION =====
 function loadQuestion() {
     const question = kbcQuestions[gameState.currentQuestion];
+    
+    console.log('📝 Loading Question:', gameState.currentQuestion + 1, question.question);
     
     // Update question number and amount
     document.getElementById('questionNum').textContent = `Question ${gameState.currentQuestion + 1} of 15`;
@@ -162,8 +168,9 @@ function loadQuestion() {
     // Shuffle and load options
     const shuffledOptions = [...question.options].sort(() => Math.random() - 0.5);
     optionBtns.forEach((btn, index) => {
-        btn.querySelector('.option-text').textContent = shuffledOptions[index];
-        btn.dataset.answer = shuffledOptions[index];
+        const optionText = shuffledOptions[index].trim();
+        btn.querySelector('.option-text').textContent = optionText;
+        btn.dataset.answer = optionText; // ✅ Set cleaned option
         btn.classList.remove('correct', 'wrong', 'selected', 'hidden');
         btn.style.display = 'flex';
         btn.disabled = false;
@@ -176,19 +183,25 @@ function loadQuestion() {
     updateLevelPanel();
 }
 
-// Select Option
+// ===== SELECT OPTION (FIXED) =====
 function selectOption(index) {
-    if (gameState.answered) return;
+    if (gameState.answered) {
+        console.log('⚠️ Already answered');
+        return;
+    }
     
-    const selectedOption = optionBtns[index].dataset.answer;
-    const correctAnswer = kbcQuestions[gameState.currentQuestion].answer;
+    const selectedOption = optionBtns[index].dataset.answer.trim();
+    const correctAnswer = kbcQuestions[gameState.currentQuestion].answer.trim();
+    
+    console.log('🎯 Selected:', selectedOption, 'Correct:', correctAnswer);
     
     gameState.answered = true;
     
     // Mark all options
     optionBtns.forEach((btn) => {
         btn.disabled = true;
-        if (btn.dataset.answer === correctAnswer) {
+        const btnAnswer = btn.dataset.answer.trim();
+        if (btnAnswer === correctAnswer) {
             btn.classList.add('correct');
         }
     });
@@ -197,20 +210,27 @@ function selectOption(index) {
     const isCorrect = selectedOption === correctAnswer;
     optionBtns[index].classList.add(isCorrect ? 'correct' : 'wrong');
     
+    console.log(isCorrect ? '✅ CORRECT!' : '❌ WRONG!');
+    
     // Show result
     setTimeout(() => {
         showResult(isCorrect);
     }, 1000);
 }
 
-// Show Result
+// ===== SHOW RESULT (FIXED) =====
 function showResult(isCorrect) {
     const question = kbcQuestions[gameState.currentQuestion];
-    const resultAmount = isCorrect ? question.amount : (gameState.currentQuestion > 0 ? kbcQuestions[gameState.currentQuestion - 1].amount : 0);
     
+    // 🔥 FIX #1: UPDATE EARNED AMOUNT WHEN ANSWER IS CORRECT
     if (isCorrect) {
         gameState.earnedAmount = question.amount;
+        console.log('💰 Earned Amount Updated:', gameState.earnedAmount);
     }
+    
+    const resultAmount = isCorrect
+        ? gameState.earnedAmount
+        : calculateFallenAmount();
     
     // Update result screen
     const resultIcon = document.getElementById('resultIcon');
@@ -223,32 +243,30 @@ function showResult(isCorrect) {
         resultTitle.textContent = 'Correct Answer!';
         resultMessage.textContent = 'Great job! Your answer is correct.';
         resultAmountEl.textContent = `Rs. ${formatAmount(gameState.earnedAmount)}`;
+        nextBtn.style.display = 'inline-block';
     } else {
         resultIcon.textContent = '❌';
         resultTitle.textContent = 'Wrong Answer!';
         resultMessage.textContent = 'Oops! That was incorrect. Game Over!';
-        resultAmountEl.textContent = `Rs. ${formatAmount(gameState.earnedAmount)}`;
+        resultAmountEl.textContent = `Rs. ${formatAmount(resultAmount)}`;
+        nextBtn.style.display = 'none';
     }
     
     hideAllScreens();
     showScreen(resultScreen);
     
-    // Auto move to next or game over
-    if (isCorrect) {
-        if (gameState.currentQuestion < kbcQuestions.length - 1) {
-            nextBtn.style.display = 'block';
-        } else {
-            // Game won
-            setTimeout(endGame, 2000);
-        }
-    } else {
-        // Game over
+    // Auto move to game over after delay
+    if (!isCorrect) {
+        setTimeout(endGame, 2000);
+    } else if (gameState.currentQuestion >= kbcQuestions.length - 1) {
+        // Game won - reached last question
         setTimeout(endGame, 2000);
     }
 }
 
-// Next Question
+// ===== NEXT QUESTION (FIXED) =====
 function nextQuestion() {
+    console.log('➡️ Next Question');
     if (gameState.currentQuestion < kbcQuestions.length - 1) {
         gameState.currentQuestion++;
         hideAllScreens();
@@ -259,11 +277,28 @@ function nextQuestion() {
     }
 }
 
-// End Game
-function endGame() {
+// ===== CALCULATE FALLEN AMOUNT (Safe Level Logic) =====
+function calculateFallenAmount() {
     const safeLevels = [10000, 320000, 10000000];
-    let guaranteedAmount = gameState.earnedAmount;
     
+    // Find the nearest LOWER safe level
+    for (let i = safeLevels.length - 1; i >= 0; i--) {
+        if (gameState.earnedAmount >= safeLevels[i]) {
+            return safeLevels[i];
+        }
+    }
+    
+    return 0; // No safe level reached yet
+}
+
+// ===== END GAME (FIXED) =====
+function endGame() {
+    console.log('🏁 Game Ended. Final Amount:', gameState.earnedAmount);
+    
+    const safeLevels = [10000, 320000, 10000000];
+    let guaranteedAmount = 0;
+    
+    // Find the highest safe level that was PASSED
     for (let level of safeLevels) {
         if (gameState.earnedAmount >= level) {
             guaranteedAmount = level;
@@ -273,7 +308,8 @@ function endGame() {
     // Update game over screen
     document.getElementById('finalAmount').textContent = `Rs. ${formatAmount(gameState.earnedAmount)}`;
     
-    if (guaranteedAmount > gameState.earnedAmount) {
+    // Only show safe level info if earned amount is HIGHER than guaranteed amount
+    if (guaranteedAmount > 0 && gameState.earnedAmount > guaranteedAmount) {
         document.getElementById('safeLevelInfo').style.display = 'block';
         document.getElementById('safeLevelAmount').textContent = `Rs. ${formatAmount(guaranteedAmount)}`;
     } else {
@@ -284,15 +320,41 @@ function endGame() {
     showScreen(gameOverScreen);
 }
 
-// Quit Game
+// // ===== QUIT GAME (FIXED) =====
+// function quitGame() {
+//     if (confirm('Are you sure you want to quit? You will be given your guaranteed amount.')) {
+//         const safeLevels = [10000, 320000, 10000000];
+//         let guaranteedAmount = 0;
+        
+//         for (let level of safeLevels) {
+//             if (gameState.earnedAmount >= level) {
+//                 guaranteedAmount = level;
+//             }
+//         }
+        
+//         // Update earned amount to safe level
+//         gameState.earnedAmount = guaranteedAmount;
+        
+//         endGame();
+//     }
+// }
+
+// 🔥 FIX: QUIT GAME - SIMPLE VERSION
 function quitGame() {
-    if (confirm('Are you sure you want to quit? Your progress will be lost.')) {
+    if (confirm('Are you sure you want to quit?')) {
+        console.log('🚪 Player quit at question:', gameState.currentQuestion + 1);
+        console.log('💰 Final amount:', gameState.earnedAmount);
+        
+        // gameState.earnedAmount is already the correct amount they earned
         endGame();
     }
 }
 
-// Restart Game
+
+// ===== RESTART GAME =====
 function restartGame() {
+    console.log('🔄 Game Restarted');
+    resetLifelinesUI();
     startGame();
 }
 
@@ -302,29 +364,29 @@ function restartGame() {
 function useFiftyFifty() {
     if (gameState.lifelinesUsed.fiftyFifty || gameState.answered) return;
     
+    console.log('🎯 Using 50-50');
     gameState.lifelinesUsed.fiftyFifty = true;
     fiftyFiftyBtn.disabled = true;
     fiftyFiftyBtn.style.opacity = '0.5';
     fiftyFiftyBtn.innerHTML = '<span class="lifeline-icon">✓</span><span class="lifeline-name">Used</span>';
     
     const question = kbcQuestions[gameState.currentQuestion];
-    const correctAnswer = question.answer;
+    const correctAnswer = question.answer.trim();
     
     const wrongOptions = [];
     optionBtns.forEach((btn, index) => {
-        if (btn.dataset.answer !== correctAnswer) {
+        const btnAnswer = btn.dataset.answer.trim();
+        if (btnAnswer !== correctAnswer) {
             wrongOptions.push(index);
         }
     });
     
     const toHide = wrongOptions.sort(() => Math.random() - 0.5).slice(0, 2);
     
-    toHide.forEach((index, delay) => {
-        setTimeout(() => {
-            optionBtns[index].classList.add('hidden');
-            optionBtns[index].style.animation = 'fadeOut 0.5s ease';
-            gameState.hiddenOptions.push(index);
-        }, delay * 200);
+    toHide.forEach((index) => {
+        optionBtns[index].classList.add('hidden');
+        optionBtns[index].style.display = 'none';
+        gameState.hiddenOptions.push(index);
     });
     
     showEnhancedNotification(
@@ -338,13 +400,14 @@ function useFiftyFifty() {
 function usePhone() {
     if (gameState.lifelinesUsed.phone || gameState.answered) return;
     
+    console.log('📞 Using Phone A Friend');
     gameState.lifelinesUsed.phone = true;
     phoneBtn.disabled = true;
     phoneBtn.style.opacity = '0.5';
     phoneBtn.innerHTML = '<span class="lifeline-icon">✓</span><span class="lifeline-name">Used</span>';
     
     const question = kbcQuestions[gameState.currentQuestion];
-    const correctAnswer = question.answer;
+    const correctAnswer = question.answer.trim();
     const pollResults = generatePhonePollResults(correctAnswer);
     
     showPhoneResult(pollResults, question);
@@ -354,29 +417,32 @@ function usePhone() {
 function useAudience() {
     if (gameState.lifelinesUsed.audience || gameState.answered) return;
     
+    console.log('👥 Using Audience Poll');
     gameState.lifelinesUsed.audience = true;
     audienceBtn.disabled = true;
     audienceBtn.style.opacity = '0.5';
     audienceBtn.innerHTML = '<span class="lifeline-icon">✓</span><span class="lifeline-name">Used</span>';
     
     const question = kbcQuestions[gameState.currentQuestion];
-    const correctAnswer = question.answer;
+    const correctAnswer = question.answer.trim();
     const pollResults = generateAudiencePollResults(correctAnswer);
     
     showAudienceResult(pollResults, question);
 }
+
 // Generate Phone Friend Poll Results
 function generatePhonePollResults(correctAnswer) {
     const results = [];
     
     optionBtns.forEach((btn, index) => {
-        const isCorrect = btn.dataset.answer === correctAnswer;
+        const btnAnswer = btn.dataset.answer.trim();
+        const isCorrect = btnAnswer === correctAnswer;
         let percentage;
         
         if (isCorrect) {
             percentage = Math.floor(Math.random() * 45 + 50); // 50-95%
         } else {
-            percentage = Math.floor(Math.random() * 30);      // 0-30%
+            percentage = Math.floor(Math.random() * 30); // 0-30%
         }
         
         results.push({
@@ -402,13 +468,14 @@ function generateAudiencePollResults(correctAnswer) {
     const results = [];
     
     optionBtns.forEach((btn, index) => {
-        const isCorrect = btn.dataset.answer === correctAnswer;
+        const btnAnswer = btn.dataset.answer.trim();
+        const isCorrect = btnAnswer === correctAnswer;
         let percentage;
         
         if (isCorrect) {
             percentage = Math.floor(Math.random() * 45 + 45); // 45-90%
         } else {
-            percentage = Math.floor(Math.random() * 25);      // 0-25%
+            percentage = Math.floor(Math.random() * 25); // 0-25%
         }
         
         results.push({
@@ -428,6 +495,7 @@ function generateAudiencePollResults(correctAnswer) {
     
     return results;
 }
+
 // Show Phone Result in Modal
 function showPhoneResult(results, question) {
     const modal = document.createElement('div');
@@ -503,6 +571,7 @@ function showAudienceResult(results, question) {
     `;
     document.body.appendChild(modal);
 }
+
 // Enhanced Notification Function
 function showEnhancedNotification(title, message, type = 'info') {
     const notification = document.createElement('div');
@@ -525,30 +594,16 @@ function showEnhancedNotification(title, message, type = 'info') {
         setTimeout(() => notification.remove(), 300);
     }, 4000);
 }
-// Reset Lifelines Display
-function resetLifelines() {
-    const states = {
-        fiftyFifty: { btn: fiftyFiftyBtn, icon: '5️⃣0️⃣', name: '50-50' },
-        phone: { btn: phoneBtn, icon: '📞', name: 'Phone' },
-        audience: { btn: audienceBtn, icon: '👥', name: 'Audience' }
-    };
-    
-    for (const [key, state] of Object.entries(states)) {
-        const used = gameState.lifelinesUsed[key === 'fiftyFifty' ? 'fiftyFifty' : key === 'phone' ? 'phone' : 'audience'];
-        state.btn.disabled = used;
-        state.btn.style.opacity = used ? '0.5' : '1';
-        state.btn.innerHTML = used ? 
-            `<span class="lifeline-icon">✓</span><span class="lifeline-name">Used</span>` : 
-            `<span class="lifeline-icon">${state.icon}</span><span class="lifeline-name">${state.name}</span>`;
-    }
-}
 
-
-// Reset Lifelines Display
+// ===== RESET LIFELINES (SINGLE VERSION - NO DUPLICATES) =====
 function resetLifelines() {
     fiftyFiftyBtn.disabled = gameState.lifelinesUsed.fiftyFifty;
     phoneBtn.disabled = gameState.lifelinesUsed.phone;
     audienceBtn.disabled = gameState.lifelinesUsed.audience;
+    
+    fiftyFiftyBtn.style.opacity = gameState.lifelinesUsed.fiftyFifty ? '0.5' : '1';
+    phoneBtn.style.opacity = gameState.lifelinesUsed.phone ? '0.5' : '1';
+    audienceBtn.style.opacity = gameState.lifelinesUsed.audience ? '0.5' : '1';
 }
 
 // Enable Lifelines
@@ -556,6 +611,29 @@ function enableLifelines() {
     fiftyFiftyBtn.disabled = false;
     phoneBtn.disabled = false;
     audienceBtn.disabled = false;
+    
+    fiftyFiftyBtn.style.opacity = '1';
+    phoneBtn.style.opacity = '1';
+    audienceBtn.style.opacity = '1';
+}
+
+// Reset Lifelines UI on Restart
+function resetLifelinesUI() {
+    gameState.lifelinesUsed.fiftyFifty = false;
+    gameState.lifelinesUsed.phone = false;
+    gameState.lifelinesUsed.audience = false;
+
+    fiftyFiftyBtn.disabled = false;
+    phoneBtn.disabled = false;
+    audienceBtn.disabled = false;
+
+    fiftyFiftyBtn.style.opacity = "1";
+    phoneBtn.style.opacity = "1";
+    audienceBtn.style.opacity = "1";
+
+    fiftyFiftyBtn.innerHTML = `<span class="lifeline-icon">5️⃣0️⃣</span><span class="lifeline-name">50-50</span>`;
+    phoneBtn.innerHTML = `<span class="lifeline-icon">📞</span><span class="lifeline-name">Phone</span>`;
+    audienceBtn.innerHTML = `<span class="lifeline-icon">👥</span><span class="lifeline-name">Audience</span>`;
 }
 
 // Update Level Panel Highlighting
@@ -568,7 +646,7 @@ function updateLevelPanel() {
     });
 }
 
-// Utility Functions
+// ===== UTILITY FUNCTIONS =====
 function formatAmount(amount) {
     return amount.toLocaleString('en-IN');
 }
@@ -583,10 +661,5 @@ function hideAllScreens() {
     });
 }
 
-function showNotification(message) {
-    alert(message);
-}
-
-
-// Initialize Game
-console.log('KBC Game Ready!');
+// ===== INITIALIZE GAME =====
+console.log('🎮 KBC Game Ready!');
